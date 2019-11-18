@@ -1,0 +1,5 @@
+#Transceiver configuration file
+callsign: LU2HES
+grid: FF99
+serial_port: '/dev/ttyUSB0'
+baudrate: 57600
