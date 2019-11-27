@@ -19,11 +19,11 @@ configs = yaml.load(configs_file)
 #Serial port for arduino
 serial_port = configs['serial_port']
 baudrate    = configs['baudrate']
-# try:
-#     puerto = serial.Serial(serial_port, baudrate, timeout=0.5)
-# except serial.serialutil.SerialException, e:
-#     print "\nNo se puede abrir puerto: " + serial_port + "\n"
-#     exit(1)
+try:
+    puerto = serial.Serial(serial_port, baudrate, timeout=0.5)
+except serial.serialutil.SerialException, e:
+    print "\nNo se puede abrir puerto: " + serial_port + "\n"
+    exit(1)
 
 #Global variables
 callsign = configs['callsign']
@@ -46,11 +46,22 @@ def encode_ft8(msg):
 
 def load_symbols(symbols):
     print "Load symbols into transmitter.."
-    # puerto.write('m')
-    # for symbol in symbols:
-    #     puerto.write(struct.pack('>B', symbol))
-    # puerto.write('\0')
+    puerto.write('m')
+    for symbol in symbols:
+        puerto.write(struct.pack('>B', symbol))
+    puerto.write('\0')
     time.sleep(1)
+
+def change_freq():
+    no_freq = True
+    while(no_freq):
+        new_freq = int(raw_input("Enter new offset frequency (0 - 2000Hz): "))
+        if (new_freq > 0 and new_freq < 2000):
+            no_freq = False
+    puerto.write('o')
+    for kk in range(2):
+        puerto.write(struct.pack('>B', (new_freq >> 8*kk) & 0xFF))
+    time.sleep(1)    
 
 def new_msg(msg):
     global current_msg
@@ -74,7 +85,7 @@ def transmit():
             utc_time = datetime.datetime.utcnow()
             if (utc_time.second % 15 == 0):
                 print "TX!"
-                #puerto.write('t')        
+                puerto.write('t')        
                 time.sleep(1)
                 break
 
@@ -111,6 +122,7 @@ cq_item         = FunctionItem("Call CQ", call_cq, [])
 retransmit_item = FunctionItem("Retransmit last", transmit, [])
 resp_new_item   = FunctionItem("Respond to new callsign", resp_new, [])
 submenu_item    = FunctionItem("Respond to last callsign", resp_last, [])
+chfreq_item     = FunctionItem("Change TX frequency", change_freq, [])
 
 #Resp submenu
 resp_grid_item   = FunctionItem("Respond with grid", respond, ['grid'])
@@ -125,5 +137,6 @@ menu.append_item(cq_item)
 menu.append_item(resp_new_item)
 menu.append_item(submenu_item)
 menu.append_item(retransmit_item)
+menu.append_item(chfreq_item)
 menu.show()
 
