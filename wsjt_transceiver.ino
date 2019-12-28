@@ -66,7 +66,7 @@ void transmit()
   
   //T/R swith to TX position
   digitalWrite(RELAY, HIGH);
-  delay(20);
+  delay(1000);
 
   // Reset the tone to the base frequency and turn on the output
   si5351.output_enable(SI5351_CLK0, 1);
@@ -91,7 +91,7 @@ void transmit()
   digitalWrite(LED, LOW);
 
   // Back to receive
-  delay(40);  
+  delay(500);  
   digitalWrite(RELAY, LOW);
 }
 

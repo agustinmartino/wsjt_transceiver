@@ -83,7 +83,7 @@ def transmit():
         print "Waiting for slot.."
         while True:
             utc_time = datetime.datetime.utcnow()
-            if (utc_time.second % 15 == 0):
+            if (utc_time.second % 15 == 14):
                 print "TX!"
                 puerto.write('t')        
                 time.sleep(1)
