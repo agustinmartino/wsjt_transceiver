@@ -16,6 +16,7 @@
 #define WSPR_TONE_SPACING       146          // ~1.46 Hz
 #define FSQ_TONE_SPACING        879          // ~8.79 Hz
 #define FT8_TONE_SPACING        625          // ~6.25 Hz
+#define FT4_TONE_SPACING       2083          // ~20.83 Hz
 
 #define JT9_DELAY               576          // Delay value for JT9-1
 #define JT65_DELAY              371          // Delay in ms for JT65A
@@ -25,7 +26,10 @@
 #define FSQ_3_DELAY             333          // Delay value for 3 baud FSQ
 #define FSQ_4_5_DELAY           222          // Delay value for 4.5 baud FSQ
 #define FSQ_6_DELAY             167          // Delay value for 6 baud FSQ
-#define FT8_DELAY               159          // Delay value for FT8
+#define FT8_DELAY               157          // Delay value for FT8
+#define FT4_DELAY                45          // Need to substract 3ms due to PLL delay
+
+#define FT4_SYMBOL_COUNT 103
 
 #define JT9_DEFAULT_FREQ        14078700UL
 #define JT65_DEFAULT_FREQ       14078300UL
@@ -33,6 +37,7 @@
 #define WSPR_DEFAULT_FREQ       14097200UL
 #define FSQ_DEFAULT_FREQ        7105350UL     // Base freq is 1350 Hz higher than dial freq in USB
 #define FT8_DEFAULT_FREQ        7074000UL
+#define FT4_DEFAULT_FREQ        7047500UL
 
 #define DEFAULT_MODE            MODE_FT8
 
@@ -42,7 +47,7 @@
 
 // Enumerations
 enum mode {MODE_JT9, MODE_JT65, MODE_JT4, MODE_WSPR, MODE_FSQ_2, MODE_FSQ_3,
-  MODE_FSQ_4_5, MODE_FSQ_6, MODE_FT8};
+           MODE_FSQ_4_5, MODE_FSQ_6, MODE_FT8, MODE_FT4};
 
 // Class instantiation
 Si5351 si5351;
@@ -95,26 +100,11 @@ void transmit()
   digitalWrite(RELAY, LOW);
 }
 
-
-void setup()
+void setup_mode(enum mode sel_mode)
 {
-  // Start serial and initialize the Si5351
-  bool i2c_found;
-  Serial.begin(57600);
-  i2c_found = si5351.init(SI5351_CRYSTAL_LOAD_8PF, 0, 0);
-
-  // Configure Relay and LED
-  pinMode(RELAY, OUTPUT);  
-  pinMode(LED, OUTPUT);  
-  digitalWrite(LED, LOW);
-  digitalWrite(RELAY, LOW);
-
-  // Set the mode to use
-  cur_mode = MODE_FT8;
-
   // Set the proper frequency, tone spacing, symbol count, and
   // tone delay depending on mode
-  switch(cur_mode)
+  switch(sel_mode)
   {
   case MODE_JT9:
     freq = JT9_DEFAULT_FREQ;
@@ -130,7 +120,7 @@ void setup()
     break;
   case MODE_JT4:
     freq = JT4_DEFAULT_FREQ;
-    symbol_count = JT4_SYMBOL_COUNT; // From the library defines
+    symbol_count = JT4_SYMBOL_COUNT; 
     tone_spacing = JT4_TONE_SPACING;
     tone_delay = JT4_DELAY;
     break;
@@ -146,6 +136,12 @@ void setup()
     tone_spacing = FT8_TONE_SPACING;
     tone_delay = FT8_DELAY;
     break;
+  case MODE_FT4:
+    freq = FT4_DEFAULT_FREQ;
+    symbol_count = FT4_SYMBOL_COUNT; 
+    tone_spacing = FT4_TONE_SPACING;
+    tone_delay = FT4_DELAY;
+    break;    
   case MODE_FSQ_2:
     freq = FSQ_DEFAULT_FREQ;
     tone_spacing = FSQ_TONE_SPACING;
@@ -167,6 +163,24 @@ void setup()
     tone_delay = FSQ_6_DELAY;
     break;
   }
+}
+
+void setup()
+{
+  // Start serial and initialize the Si5351
+  bool i2c_found;
+  Serial.begin(57600);
+  i2c_found = si5351.init(SI5351_CRYSTAL_LOAD_8PF, 0, 0);
+
+  // Configure Relay and LED
+  pinMode(RELAY, OUTPUT);  
+  pinMode(LED, OUTPUT);  
+  digitalWrite(LED, LOW);
+  digitalWrite(RELAY, LOW);
+
+  // Set the mode to use
+  cur_mode = MODE_FT8;
+  setup_mode(cur_mode);
 
   // Set CLK0 output
   si5351.drive_strength(SI5351_CLK0, SI5351_DRIVE_8MA); // Set for max power
@@ -217,6 +231,17 @@ void loop()
       offset = rec_byte[0] + (rec_byte[1] << 8);        
     }
 
+    // Switch mode
+    else if (recibido == 's')
+    {
+      if(cur_mode == MODE_FT8)
+        cur_mode = MODE_FT4;
+      else
+        cur_mode = MODE_FT8;
+      setup_mode(cur_mode);
+      message_available = false;
+    }
+    
     // Transmit
     else if (recibido == 't')
     {

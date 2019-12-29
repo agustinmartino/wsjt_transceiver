@@ -11,6 +11,7 @@ from consolemenu.items import *
 import sys
 sys.path.append(os.path.expandvars('$WEAKMON'))
 from ft8 import FT8Send
+from ft4 import FT4Send
 
 #Read configuration file
 configs_file = open('transceiver_config.yml', 'r')
@@ -30,16 +31,28 @@ callsign = configs['callsign']
 grid = configs['grid']
 current_msg = ''
 rx_callsign = ''
+mode = 'FT8'
 
 #FT8 encoder
-encoder = FT8Send()
+ft8_encoder = FT8Send()
+ft4_encoder = FT4Send()
 
 def encode_ft8(msg):
     try:
-        a77 = encoder.pack(msg, 1)
-        symbols = encoder.make_symbols(a77)
+        a77 = ft8_encoder.pack(msg, 1)
+        symbols = ft8_encoder.make_symbols(a77)
     except:
         print "FT8 encoder error, check message!"
+        symbols = None
+        time.sleep(3)
+    return symbols
+
+def encode_ft4(msg):
+    try:
+        a77 = ft4_encoder.pack(msg, 1)
+        symbols = ft4_encoder.make_symbols(a77)
+    except:
+        print "FT4 encoder error, check message!"
         symbols = None
         time.sleep(3)
     return symbols
@@ -61,13 +74,35 @@ def change_freq():
     puerto.write('o')
     for kk in range(2):
         puerto.write(struct.pack('>B', (new_freq >> 8*kk) & 0xFF))
-    time.sleep(1)    
+    time.sleep(1)
+
+def change_mode():
+    global mode
+    if 'FT8' in mode:
+        print "Switch mode to FT4!"
+        menu.remove_item(chft4_item)
+        menu.append_item(chft8_item)
+        mode = 'FT4'
+    else:
+        print "Switch mode to FT8!"
+        menu.remove_item(chft8_item)
+        menu.append_item(chft4_item)
+        mode = 'FT8'
+    puerto.write('s')
+    current_msg = ''    
+    time.sleep(1)
+    menu.show()
+
 
 def new_msg(msg):
     global current_msg
+    global mode
     print msg
     if msg != current_msg:
-        symbols = encode_ft8(msg)
+        if 'FT8' in mode:
+            symbols = encode_ft8(msg)
+        else:
+            symbols = encode_ft4(msg)            
         if symbols.any():
             load_symbols(symbols)
             current_msg = msg
@@ -83,11 +118,19 @@ def transmit():
         print "Waiting for slot.."
         while True:
             utc_time = datetime.datetime.utcnow()
-            if (utc_time.second % 15 == 14):
-                print "TX!"
-                puerto.write('t')        
-                time.sleep(1)
-                break
+            if 'FT8' in mode:
+                if (utc_time.second % 15 == 14):
+                    print "TX!"
+                    puerto.write('t')        
+                    time.sleep(1)
+                    break
+            else:
+                mscount = utc_time.second + utc_time.microsecond/1e6
+                if (abs(mscount%7.5 - 6.5) < 0.05):
+                    print "TX!"
+                    puerto.write('t')        
+                    time.sleep(1)
+                    break          
 
 def call_cq():
     msg = 'CQ ' + callsign + ' ' + grid
@@ -114,7 +157,7 @@ def respond(response):
   
 
 #Create the menus
-menu = ConsoleMenu("WJSTX Transceiver Control ", "FT8 Mode")
+menu = ConsoleMenu("WJSTX Transceiver Control ", "FT8 and FT4")
 resp_submenu = ConsoleMenu("Respond with: ", "", exit_option_text = "Go back")
 
 #Main menu
@@ -123,6 +166,8 @@ retransmit_item = FunctionItem("Retransmit last", transmit, [])
 resp_new_item   = FunctionItem("Respond to new callsign", resp_new, [])
 submenu_item    = FunctionItem("Respond to last callsign", resp_last, [])
 chfreq_item     = FunctionItem("Change TX frequency", change_freq, [])
+chft4_item      = FunctionItem("Change mode to FT4", change_mode, [])
+chft8_item      = FunctionItem("Change mode to FT8", change_mode, [])
 
 #Resp submenu
 resp_grid_item   = FunctionItem("Respond with grid", respond, ['grid'])
@@ -138,5 +183,6 @@ menu.append_item(resp_new_item)
 menu.append_item(submenu_item)
 menu.append_item(retransmit_item)
 menu.append_item(chfreq_item)
+menu.append_item(chft4_item)
 menu.show()
 
