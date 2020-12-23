@@ -21,7 +21,7 @@
 #define JT9_DELAY               576          // Delay value for JT9-1
 #define JT65_DELAY              371          // Delay in ms for JT65A
 #define JT4_DELAY               229          // Delay value for JT4A 
-#define WSPR_DELAY              683          // Delay value for WSPR
+#define WSPR_DELAY              682          // Delay value for WSPR
 #define FSQ_2_DELAY             500          // Delay value for 2 baud FSQ
 #define FSQ_3_DELAY             333          // Delay value for 3 baud FSQ
 #define FSQ_4_5_DELAY           222          // Delay value for 4.5 baud FSQ
@@ -34,7 +34,7 @@
 #define JT9_DEFAULT_FREQ        14078700UL
 #define JT65_DEFAULT_FREQ       14078300UL
 #define JT4_DEFAULT_FREQ        14078500UL
-#define WSPR_DEFAULT_FREQ       14097200UL
+#define WSPR_DEFAULT_FREQ       7038600UL
 #define FSQ_DEFAULT_FREQ        7105350UL     // Base freq is 1350 Hz higher than dial freq in USB
 #define FT8_DEFAULT_FREQ        7074000UL
 #define FT4_DEFAULT_FREQ        7047500UL
@@ -42,8 +42,10 @@
 #define DEFAULT_MODE            MODE_FT8
 
 // Hardware defines
+#define BIAS  16
 #define LED   15
 #define RELAY 14
+#define ATTENUATOR 2
 
 // Enumerations
 enum mode {MODE_JT9, MODE_JT65, MODE_JT4, MODE_WSPR, MODE_FSQ_2, MODE_FSQ_3,
@@ -71,10 +73,12 @@ void transmit()
   
   //T/R swith to TX position
   digitalWrite(RELAY, HIGH);
+  digitalWrite(ATTENUATOR, HIGH);  
   delay(1000);
 
   // Reset the tone to the base frequency and turn on the output
   si5351.output_enable(SI5351_CLK0, 1);
+  digitalWrite(BIAS, LOW);
   digitalWrite(LED, HIGH);
 
   // Now transmit the channel symbols
@@ -92,12 +96,14 @@ void transmit()
   }
 
   // Turn off the output
+  digitalWrite(BIAS, HIGH);    
   si5351.output_enable(SI5351_CLK0, 0);
   digitalWrite(LED, LOW);
 
   // Back to receive
   delay(500);  
   digitalWrite(RELAY, LOW);
+  digitalWrite(ATTENUATOR, LOW);  
 }
 
 void setup_mode(enum mode sel_mode)
@@ -172,11 +178,15 @@ void setup()
   Serial.begin(57600);
   i2c_found = si5351.init(SI5351_CRYSTAL_LOAD_8PF, 0, 0);
 
-  // Configure Relay and LED
-  pinMode(RELAY, OUTPUT);  
+  // Configure Relay, LED and BIAS
+  pinMode(BIAS, OUTPUT);    
+  pinMode(RELAY, OUTPUT);
+  pinMode(ATTENUATOR, OUTPUT);    
   pinMode(LED, OUTPUT);  
   digitalWrite(LED, LOW);
   digitalWrite(RELAY, LOW);
+  digitalWrite(ATTENUATOR, LOW);  
+  digitalWrite(BIAS, HIGH);  
 
   // Set the mode to use
   cur_mode = MODE_FT8;
@@ -241,6 +251,14 @@ void loop()
       setup_mode(cur_mode);
       message_available = false;
     }
+
+    // WSPR Mode
+    else if (recibido == 'w')
+    {
+      cur_mode = MODE_WSPR;
+      setup_mode(cur_mode);
+      message_available = false;
+    }    
     
     // Transmit
     else if (recibido == 't')
