@@ -47,6 +47,8 @@
 #define RELAY 14
 #define ATTENUATOR 2
 
+#define SERIAL_TIMEOUT 20000
+
 // Enumerations
 enum mode {MODE_JT9, MODE_JT65, MODE_JT4, MODE_WSPR, MODE_FSQ_2, MODE_FSQ_3,
            MODE_FSQ_4_5, MODE_FSQ_6, MODE_FT8, MODE_FT4};
@@ -62,7 +64,16 @@ enum mode cur_mode = DEFAULT_MODE;
 uint8_t symbol_count;
 uint16_t tone_delay, tone_spacing;
 bool message_available = false;
+unsigned int timeout;
 
+
+//Prepare transceiver for transmission (before receiving new symbols)
+void pre_transmit()
+{
+  //T/R swith to TX position
+  digitalWrite(RELAY, HIGH);
+  digitalWrite(ATTENUATOR, HIGH);  
+}
 
 // Loop through the string, transmitting one character at a time.
 void transmit()
@@ -70,11 +81,6 @@ void transmit()
   uint8_t i;
   unsigned long tx_freq;  
   tx_freq = freq + offset;
-  
-  //T/R swith to TX position
-  digitalWrite(RELAY, HIGH);
-  digitalWrite(ATTENUATOR, HIGH);  
-  delay(1000);
 
   // Reset the tone to the base frequency and turn on the output
   si5351.output_enable(SI5351_CLK0, 1);
@@ -101,7 +107,7 @@ void transmit()
   digitalWrite(LED, LOW);
 
   // Back to receive
-  delay(500);  
+  delay(200);  
   digitalWrite(RELAY, LOW);
   digitalWrite(ATTENUATOR, LOW);  
 }
@@ -176,6 +182,7 @@ void setup()
   // Start serial and initialize the Si5351
   bool i2c_found;
   Serial.begin(57600);
+  //Serial.println("Start setup");
   i2c_found = si5351.init(SI5351_CRYSTAL_LOAD_8PF, 0, 0);
 
   // Configure Relay, LED and BIAS
@@ -195,6 +202,7 @@ void setup()
   // Set CLK0 output
   si5351.drive_strength(SI5351_CLK0, SI5351_DRIVE_8MA); // Set for max power
   si5351.output_enable(SI5351_CLK0, 0); // Disable the clock initially
+  //Serial.println("End setup");
 }
 
 
@@ -213,7 +221,8 @@ void loop()
     if (recibido == 'm')
     {
       msg_index = 0;
-      while (msg_index < symbol_count)
+      timeout = 0;
+      while (msg_index < symbol_count && timeout < SERIAL_TIMEOUT)
       {
         if(Serial.available() > 0)
         {
@@ -221,8 +230,24 @@ void loop()
           tx_buffer[msg_index] = recibido;
           msg_index++;
         }
+        timeout += 1;
       }
-      message_available = true;
+      if(timeout >= SERIAL_TIMEOUT)
+      {
+        message_available = false;        
+        Serial.println("Timeout");
+        Serial.println(timeout, DEC);        
+        Serial.println(msg_index, DEC);
+        // for(unsigned char kk=0; kk<symbol_count; kk++)
+        //   Serial.println(tx_buffer[kk], DEC);
+      }
+      else
+      {
+        message_available = true;
+        //Serial.println(timeout, DEC);
+        //Serial.println(msg_index, DEC);              
+        Serial.print("m");
+      }
     }
 
     // Change offset
@@ -238,7 +263,8 @@ void loop()
           msg_index++;
         }
       }
-      offset = rec_byte[0] + (rec_byte[1] << 8);        
+      offset = rec_byte[0] + (rec_byte[1] << 8);
+      Serial.print("o");      
     }
 
     // Switch mode
@@ -250,6 +276,7 @@ void loop()
         cur_mode = MODE_FT8;
       setup_mode(cur_mode);
       message_available = false;
+      Serial.print("s");            
     }
 
     // WSPR Mode
@@ -266,6 +293,19 @@ void loop()
       if(message_available)
         transmit();
     }
+
+    //Pre transmit
+    else if (recibido == 'p')
+    {
+      pre_transmit();
+    }
+
+    else if (recibido == 'r')
+    {
+      // Send indication for ready!
+      Serial.print("r");    
+    }
+    
   }
   delay(10);  
 }
