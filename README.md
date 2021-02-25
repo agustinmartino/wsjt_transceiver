@@ -22,3 +22,7 @@ Used to program and control the Si5351  clock generator ICs from [Silicon Labs](
 #### JT65/JT9/JT4/FT8/WSPR/FSQ Encoder Library for Arduino
 https://github.com/etherkit/JTEncode
 Initially I was using this library to encode FT8 messages inside the Arduino but is limited to telemetry or free text messages. I only use some defines from this library now.
+
+## Power Amplifier Schematic
+
+![](class_e_amplifier.png?raw=true)
