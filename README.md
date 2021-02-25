@@ -25,4 +25,4 @@ Initially I was using this library to encode FT8 messages inside the Arduino but
 
 ## Power Amplifier Schematic
 
-![](class_e_amplifier.png?raw=true)
+![](class_e_amplifier.jpg?raw=true)
