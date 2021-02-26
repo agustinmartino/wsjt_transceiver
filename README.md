@@ -2,6 +2,8 @@
 # wsjt_transceiver
 A WSJT transceiver using Si5351, SDR and Arduino
 
+![](block_diagram.png?raw=true)
+
 ## Source files
 * **wjst_transceiver.ino** : Includes the code for Arduino. The channel symbols are loaded into the microcontroller using the serial port.
 The microcontroller manages Si5351 and the T/R switch.
